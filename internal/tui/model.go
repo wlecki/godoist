@@ -75,7 +75,10 @@ type Model struct {
 	inputMode  inputMode
 
 	note *noteEditor // the inline markdown editor: descriptions, notes, and comments
-	pick *picker
+	// discard is an editor that ctrl+q closed during an autosave: its old text goes back
+	// when the autosave ends (editdiscard.go).
+	discard *noteEditor
+	pick    *picker
 
 	confirm *confirmPrompt
 	cal     *calDialog // date dialog
@@ -91,7 +94,7 @@ type Model struct {
 	status     string
 	statusErr  bool
 	undos      []undoStep            // the undo stack, newest last
-	closedTask map[string]closedTask // the name and the project of each task in closed
+	closedTask map[string]closedTask // the name and the project of each completed task that u can reopen
 
 	// The completed sub-tasks that show under their open tasks (see donesubs.go).
 	doneLocal   map[string]localDone       // completed in this session, not synced yet
@@ -183,6 +186,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // updateAll handles a message. If the task under the cursor changes, the details pane goes
 // back to the top.
 func (m Model) updateAll(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if _, ok := msg.(tea.MouseMsg); ok && m.gPrefix { // a click between g and its key cancels g
+		m.cancelGoto()
+	}
 	prev := m.currentTaskID()
 	prevView := ""
 	if cur := m.currentNav(); cur != nil {

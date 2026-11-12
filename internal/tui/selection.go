@@ -172,7 +172,13 @@ func (m *Model) bulkComplete(sel []*todoist.Task) tea.Cmd {
 
 // bulkPriority sets one priority on the selected tasks.
 func (m *Model) bulkPriority(sel []*todoist.Task, p int) tea.Cmd {
-	m.rememberTasks(undoPriority, sel)
+	var changed []*todoist.Task // a task that has the priority already needs no undo
+	for _, t := range sel {
+		if t.UIPriority() != p {
+			changed = append(changed, t)
+		}
+	}
+	m.rememberTasks(undoPriority, changed)
 	var ids []string
 	for _, t := range sel {
 		t.Priority = 5 - p

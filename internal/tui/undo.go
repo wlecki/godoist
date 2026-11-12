@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -54,6 +55,14 @@ func (m *Model) pushUndo(s undoStep) {
 // rememberTasks puts a step on the undo stack that writes back field kind of ts. Call it
 // before the change.
 func (m *Model) rememberTasks(kind undoKind, ts []*todoist.Task) {
+	if s, ok := undoStepOf(kind, ts); ok {
+		m.pushUndo(s)
+	}
+}
+
+// undoStepOf returns the step that writes back field kind of ts. ok is false if ts has no
+// task.
+func undoStepOf(kind undoKind, ts []*todoist.Task) (s undoStep, ok bool) {
 	var was []taskWas
 	for _, t := range ts {
 		if t == nil {
@@ -67,28 +76,34 @@ func (m *Model) rememberTasks(kind undoKind, ts []*todoist.Task) {
 		}
 		was = append(was, w)
 	}
-	if len(was) > 0 {
-		m.pushUndo(undoStep{kind: kind, was: was})
-	}
+	return undoStep{kind: kind, was: was}, len(was) > 0
 }
 
 // rememberIDs is rememberTasks for task IDs.
 func (m *Model) rememberIDs(kind undoKind, ids []string) {
+	m.rememberTasks(kind, m.tasksByID(ids))
+}
+
+// tasksByID returns the tasks with these IDs, nil for a task that is gone.
+func (m *Model) tasksByID(ids []string) []*todoist.Task {
 	ts := make([]*todoist.Task, 0, len(ids))
 	for _, id := range ids {
 		ts = append(ts, m.taskByID(id))
 	}
-	m.rememberTasks(kind, ts)
+	return ts
 }
 
 // undoChange writes back the old values of a step that is not a completion. The task list
 // shows them at once, and the sync confirms them.
+// A task that is gone (deleted, or not in the replica any more) is left out.
 func (m *Model) undoChange(s undoStep) tea.Cmd {
+	var was []taskWas
 	for _, w := range s.was {
 		t := m.taskByID(w.id)
 		if t == nil {
 			continue
 		}
+		was = append(was, w)
 		switch s.kind {
 		case undoPriority:
 			t.Priority = w.priority
@@ -98,20 +113,24 @@ func (m *Model) undoChange(s undoStep) tea.Cmd {
 			t.Labels = slices.Clone(w.labels)
 		}
 	}
+	if len(was) == 0 {
+		m.setStatus("nothing to undo: the task is gone", false)
+		return nil
+	}
 	m.buildRows(false)
 	what := map[undoKind]string{undoPriority: "priority", undoDue: "date", undoMove: "move", undoLabels: "labels"}[s.kind]
 	done := "Undid the " + what + " change"
-	if len(s.was) > 1 {
-		done += fmt.Sprintf(" of %d tasks", len(s.was))
+	if len(was) > 1 {
+		done += fmt.Sprintf(" of %d tasks", len(was))
 	}
-	client, was, kind := m.client, s.was, s.kind
+	client, kind := m.client, s.kind
 	return m.simpleWrite(done, func(ctx context.Context) error {
+		// One failed task does not stop the others: the step is gone from the stack.
+		var errs []error
 		for _, w := range was {
-			if err := writeBack(ctx, client, kind, w); err != nil {
-				return err
-			}
+			errs = append(errs, writeBack(ctx, client, kind, w))
 		}
-		return nil
+		return errors.Join(errs...)
 	})
 }
 

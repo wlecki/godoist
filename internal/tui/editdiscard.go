@@ -13,6 +13,25 @@ func (m Model) discardNoteEditor() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	e.lines = splitRunes(e.orig)
-	next := m.saveNote(e, "Changes discarded · the old text is back")
+	if e.saving { // two writes at once could land in any order: wait for the autosave
+		m.discard = e
+		m.setStatus("discarding the changes…", false)
+		return m, nil
+	}
+	next := m.saveNote(e, discardDone)
 	return m, next
+}
+
+// discardDone is the status after ctrl+q wrote the old text back.
+const discardDone = "Changes discarded · the old text is back"
+
+// discardAfterSave sends the old text of a discarded editor once its autosave ended. ok
+// is false if no discard waits.
+func (m *Model) discardAfterSave() (next tea.Cmd, ok bool) {
+	e := m.discard
+	if e == nil {
+		return nil, false
+	}
+	m.discard = nil
+	return m.saveNote(e, discardDone), true
 }

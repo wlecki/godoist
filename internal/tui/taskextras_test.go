@@ -45,7 +45,8 @@ func TestSelectAll(t *testing.T) {
 }
 
 // D adds a copy of the task under the cursor: an add with the name, project and section,
-// then one update with the other fields.
+// then one update with the other fields. The date goes as a date, not as its text, so
+// that a text like "tomorrow" does not move the copy.
 func TestDuplicate(t *testing.T) {
 	var (
 		mu  sync.Mutex
@@ -64,7 +65,8 @@ func TestDuplicate(t *testing.T) {
 	src.Description, src.Priority, src.Labels = "notes", 3, []string{"home"}
 	m.client = todoist.New("tok")
 	m.client.SetBaseURL(srv.URL)
-	cmd := m.duplicateTask()
+	nm, cmd := m.Update(key("D"))
+	m = nm.(Model)
 	if m.pending != 1 || cmd == nil {
 		t.Fatalf("pending = %d, want one write", m.pending)
 	}
@@ -77,9 +79,20 @@ func TestDuplicate(t *testing.T) {
 	if !strings.HasPrefix(got[0], "POST /tasks ") || !strings.Contains(got[0], `"content":"`+src.Content+`"`) {
 		t.Errorf("add = %q", got[0])
 	}
-	for _, want := range []string{"POST /tasks/new ", `"priority":3`, `"description":"notes"`, `"labels":["home"]`, `"due_string":"`} {
+	for _, want := range []string{"POST /tasks/new ", `"priority":3`, `"description":"notes"`, `"labels":["home"]`, `"due_date":"2029-12-31"`} {
 		if !strings.Contains(got[1], want) {
 			t.Errorf("update %q has no %q", got[1], want)
 		}
+	}
+	if strings.Contains(got[1], "due_string") {
+		t.Errorf("update %q sends the date as text", got[1])
+	}
+}
+
+// In the notebook view, ctrl+a counts each note once, not its preview lines too.
+func TestSelectAllNotebook(t *testing.T) {
+	m := send(t, notesModel(t), key("ctrl+a"))
+	if n := len(m.selectedTasks()); n == 0 || m.status != plural(n, "task")+" selected" {
+		t.Errorf("%d selected, status %q", n, m.status)
 	}
 }

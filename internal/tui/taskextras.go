@@ -43,11 +43,15 @@ func (m Model) yankURL() (tea.Model, tea.Cmd) {
 func (m *Model) selectAll() {
 	var ids []string
 	for _, r := range m.rows {
-		if r.task != nil && !r.done && !r.doneSub {
+		if r.task != nil && r.preview == "" && !r.done && !r.doneSub {
 			ids = append(ids, r.task.ID)
 		}
 	}
-	all := len(ids) > 0
+	if len(ids) == 0 {
+		m.setStatus("no open tasks to select", false)
+		return
+	}
+	all := true
 	for _, id := range ids {
 		all = all && m.selected[id]
 	}
@@ -62,7 +66,7 @@ func (m *Model) selectAll() {
 	for _, id := range ids {
 		m.selected[id] = true
 	}
-	m.setStatus(fmt.Sprintf("%d tasks selected", len(ids)), false)
+	m.setStatus(plural(len(ids), "task")+" selected", false)
 }
 
 // duplicateTask adds a copy of the task under the cursor (D): the same name, description,
@@ -81,10 +85,13 @@ func (m *Model) duplicateTask() tea.Cmd {
 	if len(src.Labels) > 0 {
 		fields["labels"] = src.Labels
 	}
+	// The date goes as a date, not as its text: Todoist would read "tomorrow" from today.
+	// A recurring copy keeps the rule and the current date, in one more command.
 	switch {
-	case src.Due != nil && src.Due.String != "":
-		fields["due_string"] = src.Due.String // keeps a repeat
-	case src.Due != nil:
+	case src.Due == nil, src.Due.IsRecurring:
+	case len(src.Due.Date) > len("2006-01-02"):
+		fields["due_datetime"] = src.Due.Date
+	default:
 		fields["due_date"] = src.Due.Date
 	}
 	return m.write("", func(ctx context.Context) (string, error) {
@@ -94,6 +101,11 @@ func (m *Model) duplicateTask() tea.Cmd {
 		}
 		if _, err := client.UpdateTask(ctx, nt.ID, fields); err != nil {
 			return "", fmt.Errorf("copied, but not all fields: %w", err)
+		}
+		if src.Due != nil && src.Due.IsRecurring {
+			if err := writeDue(ctx, client, nt.ID, src.Due); err != nil {
+				return "", fmt.Errorf("copied, but not its date: %w", err)
+			}
 		}
 		if p := src.Parent(); p != "" {
 			if err := client.MoveToParent(ctx, nt.ID, p); err != nil {

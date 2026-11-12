@@ -15,7 +15,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The help scrolls with `j` / `k`, `ctrl+d` / `ctrl+u`, `g` / `G`, and the mouse wheel. Before, the end of the help did not show on most terminals.
 - `ctrl+d` / `ctrl+u` move half a page in the sidebar too.
 - Jump keys: `gt` Today, `gu` Upcoming, `gi` Inbox, and `gp` or `ctrl+k` for a list of all views, projects, and labels to go to.
-- `u` undoes the last change: a completion, as before, and now also a priority, a date (`t` or `p`), a move, or a label change, also for selected tasks. `ctrl+z` still works.
+- `u` undoes the last change: a completion, as before, and now also a priority, a date (`t` or `p`), a move (`m` or the mouse), or a label change, also for selected tasks. `ctrl+z` still works.
 - `ctrl+q` in the markdown editor closes it and drops the changes.
 - `O` opens the task in the Todoist web app, `Y` copies its link, `D` copies the task, and `ctrl+a` selects all tasks of the view.
 

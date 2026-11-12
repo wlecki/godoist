@@ -145,7 +145,7 @@ Push `?` to see all keys. `j` / `k`, `ctrl+d` / `ctrl+u`, `g` / `G`, and the mou
 | `enter` | Open the project, or open the details. |
 | `gt` / `gu` / `gi` | Go to Today, Upcoming, or the Inbox. After `g`, a key that is not a jump key works as usual. |
 | `gp` or `ctrl+k` | Go to a view, a project, or a label: type to filter the list, `enter` opens it. |
-| `u` | Undo the last change: a completion, a priority, a date, a move, or labels. `ctrl+z` does the same. |
+| `u` | Undo the last change: a completion, a priority, a date, a move with `m` or the mouse, or labels. A moved task goes back to its project, section, or parent task, at the end. The order keys (`[`, `]`, `>`, `<`) and the notebook moves have no undo. `ctrl+z` does the same. |
 | `a` | Add a task. The dialog has a name, which Todoist parses, and a description. |
 | `x` or `space` | Complete the task. The name flies to **✓ Completed** in the sidebar. A recurring task blinks in its place. `u` (or `ctrl+z`) undoes the last completion of a one-time task, and the name flies back to its project. A sub-task of an open task stays under its task, struck through. `x` on it reopens it. |
 | `e` | Edit the name and the description. `#project`, `/section`, `@label`, and `p1`–`p4` in the name change only those fields. Dates in the name are not read: use `t`. |

@@ -278,7 +278,7 @@ func (m *Model) skipDates(ts []todoist.Task) tea.Cmd {
 }
 
 // closedTask is the name and the project of a task on the undo stack, for the flight of
-// ctrl+z to the project. inPlace is true for a sub-task that stays under its open task.
+// u to the project. inPlace is true for a sub-task that stays under its open task.
 type closedTask struct {
 	name, projectID string
 	inPlace         bool

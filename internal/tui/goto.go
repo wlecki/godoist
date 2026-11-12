@@ -17,20 +17,11 @@ const gotoHint = "g… · g top · t Today · u Upcoming · i Inbox · p go to�
 // gotoKeys handles the key after g. ok is false if the key is not a jump key: it then
 // works as usual.
 func (m Model) gotoKeys(key string) (tea.Model, tea.Cmd, bool) {
-	m.gPrefix = false
-	if m.status == gotoHint {
-		m.setStatus("", false)
-	}
+	m.cancelGoto()
 	switch key {
-	case "g":
-		switch m.focus {
-		case paneNav:
-			m.moveNav(-len(m.nav))
-		case paneDetail:
-			m.detOff, m.comCur = 0, -1
-		default:
-			m.moveRow(-len(m.rows))
-		}
+	case "g": // the same as home in each pane
+		nm, cmd := m.updateKeys(tea.KeyPressMsg{Code: tea.KeyHome})
+		return nm, cmd, true
 	case "t":
 		m.gotoKind(vkToday)
 	case "u":
@@ -47,12 +38,22 @@ func (m Model) gotoKeys(key string) (tea.Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
+// cancelGoto stops waiting for the key after g.
+func (m *Model) cancelGoto() {
+	m.gPrefix = false
+	if m.status == gotoHint {
+		m.setStatus("", false)
+	}
+}
+
 // gotoNav opens the sidebar item with navKey key and puts the focus on the task list.
+// Like a move in the sidebar, it clears the find text of the old view.
 func (m *Model) gotoNav(key string) {
 	m.pick = nil
 	before := m.navCur
 	m.selectNav(func(n navItem) bool { return navKey(n) == key })
 	if m.navCur != before {
+		m.find = ""
 		m.buildRows(true)
 	}
 	m.detailOpen = false
@@ -84,10 +85,12 @@ func (m *Model) gotoInbox() {
 func (m *Model) openGotoPicker() tea.Cmd {
 	var items []pickItem
 	cur := 0
+	seen := map[string]bool{} // a favorite is in the sidebar twice
 	for i, n := range m.nav {
-		if n.header != "" || n.kind == vkLabelHint || n.name == "" {
+		if n.header != "" || n.kind == vkLabelHint || n.name == "" || seen[navKey(n)] {
 			continue
 		}
+		seen[navKey(n)] = true
 		if i == m.navCur {
 			cur = len(items)
 		}

@@ -202,6 +202,9 @@ func (m *Model) saveNote(e *noteEditor, done string) tea.Cmd {
 
 func (m Model) noteSaved(msg noteSavedMsg) (tea.Model, tea.Cmd) {
 	m.pending = max(0, m.pending-1)
+	if next, ok := m.discardAfterSave(); ok { // also after a failed autosave
+		return m, next
+	}
 	e := m.note
 	if msg.err != nil {
 		if e != nil {

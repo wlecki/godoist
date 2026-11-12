@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -115,5 +116,31 @@ func TestWriteBack(t *testing.T) {
 				t.Errorf("kind %d %+v: request %q has no %q", tc.kind, tc.w, got[0], w)
 			}
 		}
+	}
+}
+
+// The date dialog puts an undo step on the stack only when the save worked.
+func TestUndoDateOnlyAfterSave(t *testing.T) {
+	m := openCal(t, 0)
+	nm, cmd := m.calSave(func(context.Context) (string, error) { return "", errors.New("no") })
+	m = send(t, nm.(Model), cmd())
+	if len(m.undos) != 0 || m.cal == nil {
+		t.Fatalf("undos = %d after a failed save, want none and the dialog open", len(m.undos))
+	}
+	nm, cmd = m.calSave(func(context.Context) (string, error) { return "Due → today", nil })
+	m = send(t, nm.(Model), cmd())
+	if len(m.undos) != 1 || m.undos[0].kind != undoDue {
+		t.Errorf("undos = %+v after a save, want one date step", m.undos)
+	}
+}
+
+// u for a task that is gone sends nothing.
+func TestUndoGoneTask(t *testing.T) {
+	m := send(t, onRow(t, 1), key("1"))
+	m.removeTask(m.undos[0].was[0].id)
+	pending := m.pending
+	m = send(t, m, key("u"))
+	if m.pending != pending || !strings.Contains(m.status, "gone") {
+		t.Errorf("pending = %d status = %q, want no write", m.pending, m.status)
 	}
 }

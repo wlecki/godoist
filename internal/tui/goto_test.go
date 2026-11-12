@@ -34,3 +34,28 @@ func TestGotoPicker(t *testing.T) {
 		t.Errorf("picker open %v nav %+v focus %d, want the work project", m.pick != nil, cur, m.focus)
 	}
 }
+
+// A click between g and the next key cancels g: t after the click opens the date dialog,
+// it does not jump to Today.
+func TestGotoPrefixMouse(t *testing.T) {
+	m := send(t, onRow(t, 1), key("g"))
+	x := m.layout().mid.x + 10
+	m = send(t, m, click(x, 3), release(x, 3)) // another row: a second click on a row is a double click
+	if m.gPrefix || m.status == gotoHint {
+		t.Fatalf("prefix %v status %q after a click, want g cancelled", m.gPrefix, m.status)
+	}
+	m = send(t, m, key("t"))
+	if m.cal == nil {
+		t.Error("t after the click did not open the date dialog")
+	}
+}
+
+// A jump clears the find text of the old view, like a move in the sidebar.
+func TestGotoClearsFind(t *testing.T) {
+	m := onRow(t, 1)
+	m.find = "alpha"
+	m = send(t, m, key("g"), key("i"))
+	if m.find != "" {
+		t.Errorf("find = %q after gi, want it cleared", m.find)
+	}
+}

@@ -14,12 +14,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - `N` in the task list adds a section, also with the cursor on a task. Before, a project without sections had no key for its first section.
 - The help scrolls with `j` / `k`, `ctrl+d` / `ctrl+u`, `g` / `G`, and the mouse wheel. Before, the end of the help did not show on most terminals.
 - `ctrl+d` / `ctrl+u` move half a page in the sidebar too.
+- Jump keys: `gt` Today, `gu` Upcoming, `gi` Inbox, and `gp` or `ctrl+k` for a list of all views, projects, and labels to go to.
+- `u` undoes the last change: a completion, as before, and now also a priority, a date (`t` or `p`), a move (`m` or the mouse), or a label change, also for selected tasks. `ctrl+z` still works.
+- `ctrl+q` in the markdown editor closes it and drops the changes.
+- `O` opens the task in the Todoist web app, `Y` copies its link, `D` copies the task, and `ctrl+a` selects all tasks of the view.
 
 ### Changed
 
 - In the date dialog, the first key you type replaces the old date. Before, "tod" went after the old date. An arrow key first lets you edit the old date.
 - In the details pane with checkboxes, `space` selects the first checkbox when none is selected. It no longer completes the task. `x` still does.
 - In the details pane, `Delete` / `Backspace` delete the selected comment, or the task when no comment is selected. `d` still deletes a comment.
+- `g` alone no longer goes to the top: use `gg` (or `Home`).
 - `q` in the help closes the help. Before, it quit godoist. `ctrl+c` still quits.
 
 ## [1.2.2] - 2026-11-12

@@ -153,7 +153,8 @@ func (m *Model) openCalendarWith(ts []*todoist.Task, text string) tea.Cmd {
 	c.text.SetWidth(calWidth - 6)
 	c.text.SetValue(text)
 	c.text.CursorEnd()
-	c.fresh = text != "" && text != mixedDue
+	// Not for a repeat: one typed key would drop it.
+	c.fresh = text != "" && text != mixedDue && !c.recurring
 	c.timeIn = newTextInput()
 	c.timeIn.Prompt = ""
 	c.timeIn.Placeholder = "all day"

@@ -40,4 +40,11 @@ func TestHelpScroll(t *testing.T) {
 	if m.helpOff != 0 {
 		t.Errorf("the help opens at offset %d, want 0", m.helpOff)
 	}
+	if m = send(t, m, key("esc")); m.showHelp {
+		t.Error("esc did not close the help")
+	}
+	m.pending = 1 // with a write in flight, quit waits and sets quitting
+	if m = send(t, m, key("?"), key("ctrl+c")); !m.quitting {
+		t.Error("ctrl+c in the help did not quit")
+	}
 }

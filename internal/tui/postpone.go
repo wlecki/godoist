@@ -60,7 +60,7 @@ func (m *Model) openPostpone() tea.Cmd {
 		text = "due " + dueLabel(due, hasTime)
 	}
 	id := t.ID
-	m.confirm = &confirmPrompt{title: "Postpone",
+	m.confirm = &confirmPrompt{title: "Postpone", sel: 1, // enter is 1 day, as before Today came
 		head: "“" + plain(t.Content) + "”",
 		text: text,
 		buttons: postponeButtons(func(m *Model, days int) tea.Cmd { return m.postpone(id, days) },
@@ -92,22 +92,30 @@ func postponeButtons(move func(m *Model, days int) tea.Cmd, custom func(m *Model
 }
 
 // openBulkPostpone opens the postpone dialog for the selected tasks. Each task moves from
-// its own date.
+// its own date. The selection stays, as after the other bulk changes.
 func (m *Model) openBulkPostpone(ts []*todoist.Task) tea.Cmd {
 	ids := make([]string, len(ts))
 	for i, t := range ts {
 		ids[i] = t.ID
 	}
-	m.confirm = &confirmPrompt{title: "Postpone",
+	m.confirm = &confirmPrompt{title: "Postpone", sel: 1,
 		text: fmt.Sprintf("%d selected tasks", len(ts)),
 		buttons: postponeButtons(func(m *Model, days int) tea.Cmd {
-			var cmds []tea.Cmd
+			var sends []func(context.Context) error
 			for _, id := range ids {
-				cmds = append(cmds, m.postpone(id, days))
+				if _, send := m.postponeWrite(id, days); send != nil {
+					sends = append(sends, send)
+				}
 			}
-			m.clearSelection()
-			m.setStatus(fmt.Sprintf("Postponed %d tasks", len(ids)), false)
-			return tea.Batch(cmds...)
+			// One write that sends the tasks one by one, like the other bulk changes.
+			return m.simpleWrite(fmt.Sprintf("Postponed %d tasks", len(sends)), func(ctx context.Context) error {
+				for _, send := range sends {
+					if err := send(ctx); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
 		}, func(m *Model) tea.Cmd {
 			return m.openCalendarFor(m.selectedTasks())
 		})}
@@ -117,9 +125,19 @@ func (m *Model) openBulkPostpone(ts []*todoist.Task) tea.Cmd {
 // postpone moves the date of task id by days. The time stays. A recurring task moves only
 // this date.
 func (m *Model) postpone(id string, days int) tea.Cmd {
+	text, send := m.postponeWrite(id, days)
+	if send == nil {
+		return nil
+	}
+	return m.simpleWrite(text, send)
+}
+
+// postponeWrite returns the status text and the write that move the date of task id by
+// days. send is nil if the task is gone.
+func (m *Model) postponeWrite(id string, days int) (text string, send func(context.Context) error) {
 	t := m.taskByID(id)
 	if t == nil {
-		return nil
+		return "", nil
 	}
 	due, hasTime, _ := baseDue(t, time.Now())
 	to := postponeTo(due, days, time.Now())
@@ -127,18 +145,18 @@ func (m *Model) postpone(id string, days int) tea.Cmd {
 	if hasTime {
 		date, field = to.Format("2006-01-02T15:04:05"), "due_datetime"
 	}
-	text := "Postponed to " + dueLabel(to, hasTime)
+	text = "Postponed to " + dueLabel(to, hasTime)
 	recurring, client := t.Due != nil && t.Due.IsRecurring, m.client
 	var rule, lang string
 	if recurring {
 		rule, lang = t.Due.String, t.Due.Lang
 		text += " · repeats " + rule
 	}
-	return m.write(text, func(ctx context.Context) (string, error) {
+	return text, func(ctx context.Context) error {
 		if recurring {
-			return "", client.MoveOccurrence(ctx, id, date, rule, lang)
+			return client.MoveOccurrence(ctx, id, date, rule, lang)
 		}
 		_, err := client.UpdateTask(ctx, id, map[string]any{field: date})
-		return "", err
-	})
+		return err
+	}
 }

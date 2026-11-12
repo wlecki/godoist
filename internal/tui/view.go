@@ -116,7 +116,7 @@ func (m Model) render() string {
 		// The help spans the task list and the details pane.
 		helpW := midW + detW
 		return joinPanes(nav,
-			boxLines(st(hexText).Bold(true).Render("Help")+st(hexMuted).Render(" · godoist "+version.String()), padLines(m.helpWindow(helpW-2, h), helpW-2, h), helpW, hexAccent)) +
+			boxLines(st(hexText).Bold(true).Render("Help")+st(hexMuted).Render(" · godoist "+version.String()+" · j/k scroll · esc close"), padLines(m.helpWindow(helpW-2, h), helpW-2, h), helpW, hexAccent)) +
 			"\n" + m.bottomBar()
 	case m.note != nil && !m.wide():
 		mid = boxLines(m.noteTitle(), m.noteLines(midW-2, h), midW, fg(hexAccent))
@@ -978,7 +978,7 @@ func helpSections() [][]string {
 	return [][]string{
 		{h("Navigation"),
 			k("tab", "next pane: sidebar → list → details"),
-			k("", "in a note with checkboxes: the next checkbox"),
+			k("", "details with checkboxes or sub-notes: the next one"),
 			k("h / l", "previous / next pane"),
 			k("j / k", "move down / up"),
 			k("g / G", "top / bottom"),
@@ -1049,7 +1049,8 @@ func helpSections() [][]string {
 			k("esc", "leave the editor")},
 		{h("Details pane"),
 			k("j / k", "select a comment"),
-			k("e / del", "edit / delete the selected comment"),
+			k("e / del", "edit / delete the selected comment (also d)"),
+			k("del", "no comment selected: delete the task"),
 			k("space", "select the first checkbox · x completes"),
 			k("", "no comment selected: e edits the name")},
 		{h("Editor and pickers"),

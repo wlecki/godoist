@@ -52,6 +52,9 @@ func TestPostponeDialog(t *testing.T) {
 			t.Errorf("button %d goes past the border: %v", i, h)
 		}
 	}
+	if p.sel != 1 {
+		t.Errorf("selected button %d, want 1 (1 day): enter must not move the task to today", p.sel)
+	}
 	if w := send(t, m, key("1")); w.confirm != nil || w.pending != 1 {
 		t.Errorf("1 day: confirm = %v pending = %d", w.confirm != nil, w.pending)
 	}
@@ -77,7 +80,7 @@ func TestPostponeUndated(t *testing.T) {
 	}
 }
 
-// With tasks selected, p postpones all of them and clears the selection.
+// With tasks selected, p postpones all of them in one write, and the selection stays.
 func TestPostponeSelected(t *testing.T) {
 	m := onRow(t, 1)
 	m = send(t, m, key("s"), key("j"), key("s"))
@@ -89,7 +92,7 @@ func TestPostponeSelected(t *testing.T) {
 		t.Fatalf("confirm = %+v", m.confirm)
 	}
 	m = send(t, m, key("1"))
-	if m.pending != 2 || len(m.selectedTasks()) != 0 {
-		t.Errorf("pending = %d selected = %d, want 2 writes and no selection", m.pending, len(m.selectedTasks()))
+	if m.pending != 1 || len(m.selectedTasks()) != 2 {
+		t.Errorf("pending = %d selected = %d, want one write and the selection", m.pending, len(m.selectedTasks()))
 	}
 }

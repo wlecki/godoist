@@ -236,8 +236,6 @@ func (m Model) detailKeys(key string) (tea.Model, tea.Cmd) {
 	if nm, cmd, ok := m.doneSubKeys(key, true); ok {
 		return nm, cmd
 	}
-	// space toggles the selected checkbox. In task view with no checkbox selected, space
-	// still completes the task.
 	if k := m.chkCur - m.noteChecks(); m.chkCur >= 0 && k >= 0 && k < m.noteSubnotes() && key == "enter" {
 		next := m.openSubnoteAt(k) // enter on a selected sub-note opens it
 		return m, next
@@ -265,6 +263,9 @@ func (m Model) detailKeys(key string) (tea.Model, tea.Cmd) {
 	if key == "enter" && m.notesMode() && m.comCur < 0 {
 		next := m.openNoteEditor()
 		return m, next
+	}
+	if nm, cmd, ok := m.completedKeys(key); ok { // a completed task: x reopens, other keys wait
+		return nm, cmd
 	}
 	if nm, cmd, ok := m.propertyKeys(key); ok {
 		return nm, cmd

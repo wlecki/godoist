@@ -26,6 +26,7 @@ func (m Model) helpWindow(w, h int) []string {
 // helpKeys handles a key while the help is open.
 func (m Model) helpKeys(key string) (tea.Model, tea.Cmd) {
 	page := max(1, m.paneHeight()/2)
+	m.helpOff = min(max(0, m.helpOff), m.helpMaxOff()) // the terminal may have grown
 	switch key {
 	case "ctrl+c":
 		return m.quit()

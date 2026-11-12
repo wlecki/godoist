@@ -10,8 +10,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - `p` has a **Today** button (`t`), and it works on tasks without a date: they count from today.
-- `p` postpones all selected tasks, like `t`, `m`, and `1`–`4`.
-- `N` adds a section from anywhere in a project, also on a task. Before, a project without sections had no key for its first section.
+- `p` postpones all selected tasks, like `t`, `m`, and `1`–`4`. The selection stays.
+- `N` in the task list adds a section, also with the cursor on a task. Before, a project without sections had no key for its first section.
 - The help scrolls with `j` / `k`, `ctrl+d` / `ctrl+u`, `g` / `G`, and the mouse wheel. Before, the end of the help did not show on most terminals.
 - `ctrl+d` / `ctrl+u` move half a page in the sidebar too.
 

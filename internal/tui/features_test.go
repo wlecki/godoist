@@ -183,6 +183,14 @@ func TestCompletedView(t *testing.T) {
 	if !strings.Contains(m.status, "reopen the task first") {
 		t.Errorf("status = %q, want the reopen hint", m.status)
 	}
+	// In the details pane too, del and p on a completed task only show the hint.
+	d := m
+	d.focus = paneDetail
+	for _, k := range []string{"delete", "p"} {
+		if d2 := send(t, d, key(k)); d2.confirm != nil || !strings.Contains(d2.status, "reopen the task first") {
+			t.Errorf("details %s: confirm = %v status = %q", k, d2.confirm != nil, d2.status)
+		}
+	}
 	m = send(t, m, key("x"))
 	if m.pending != 1 || len(m.completed) != 0 {
 		t.Errorf("pending = %d completed = %d, want a reopen", m.pending, len(m.completed))

@@ -131,7 +131,7 @@ func (m *Model) rename(text string, desc *string) tea.Cmd {
 	if descChanged {
 		newDesc = desc
 	}
-	st := m.st // ApplyName only reads the projects and the sections
+	st := m.withoutHidden(m.st) // ApplyName only reads the projects and the sections
 	cmd := m.write("", func(ctx context.Context) (string, error) {
 		p, fields, err := client.ApplyName(ctx, &st, cur, text, newDesc)
 		if err != nil {

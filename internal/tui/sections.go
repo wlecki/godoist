@@ -65,7 +65,7 @@ func (m Model) sectionKeys(key string) (tea.Model, tea.Cmd, bool) {
 			}
 		}
 		id, name, client := s.ID, s.Name, m.client
-		text := fmt.Sprintf("Delete section “%s”? It has no tasks.", name)
+		text := fmt.Sprintf("Delete section “%s”? It has no tasks. %s", name, undoHint)
 		if n > 0 {
 			text = fmt.Sprintf("Delete section “%s” and its %d task(s)? %s", name, n, undoHint)
 		}

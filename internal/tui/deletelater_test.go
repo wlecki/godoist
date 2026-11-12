@@ -96,9 +96,9 @@ func TestDeleteSendsAfterWait(t *testing.T) {
 	if m.taskByID("t1") != nil {
 		t.Error("an old sync brought the deleted task back")
 	}
-	m = send(t, m, key("u"))
-	if !strings.Contains(m.status, "too late") {
-		t.Errorf("status = %q, want too late", m.status)
+	m = send(t, m, key("u")) // the delete step left the stack when the delete went
+	if m.status != "nothing to undo" {
+		t.Errorf("status = %q, want nothing to undo", m.status)
 	}
 	var fresh todoist.SyncState = old.Clone()
 	fresh.Tasks = fresh.Tasks[1:] // Todoist no longer has t1
@@ -168,5 +168,77 @@ func TestDeleteHidesWhatGoesWith(t *testing.T) {
 	m.deleteLater("the comment", []hiddenItem{{hideComment, "c1"}}, noop)
 	if cs := m.snap.Comments["t1"]; len(cs) != 1 || cs[0].ID != "c2" {
 		t.Errorf("comments = %+v, want only c2", cs)
+	}
+}
+
+// u while the delete is on its way says that it is too late.
+func TestDeleteUndoInFlight(t *testing.T) {
+	m := send(t, onRow(t, 1), key("delete"), key("enter"))
+	m = send(t, m, deleteNowMsg{n: m.laterN}, key("u"))
+	if !strings.Contains(m.status, "too late") || m.taskByID("t1") != nil {
+		t.Errorf("status = %q, want too late and the task still hidden", m.status)
+	}
+}
+
+// When a delete went, u undoes the change before it, not the delete.
+func TestDeleteStepLeavesStack(t *testing.T) {
+	c, _ := deleteServer(t, http.StatusNoContent)
+	m := onRow(t, 2)
+	m.client = c
+	m = send(t, m, key("1"), key("k"), key("delete"), key("enter"))
+	if m.taskByID("t1") != nil {
+		t.Fatal("alpha was not deleted")
+	}
+	nm, cmd := m.Update(deleteNowMsg{n: m.laterN})
+	m = send(t, nm.(Model), runCmd(t, cmd))
+	m = send(t, m, key("u"))
+	if p := m.taskByID("t2").Priority; p != 1 || len(m.undos) != 0 {
+		t.Errorf("priority = %d undos = %d, want the priority change undone", p, len(m.undos))
+	}
+}
+
+// If the delete that q sends fails, godoist stays open and shows the error.
+func TestQuitDeleteFails(t *testing.T) {
+	c, _ := deleteServer(t, http.StatusForbidden)
+	m := onRow(t, 1)
+	m.client = c
+	m = send(t, m, key("delete"), key("enter"))
+	nm, cmd := m.Update(key("q"))
+	nm, cmd = nm.(Model).Update(runCmd(t, cmd))
+	m = nm.(Model)
+	if m.quitting || !strings.Contains(m.status, "could not delete") || m.taskByID("t1") == nil {
+		t.Fatalf("quitting = %v status = %q, want godoist open with the error", m.quitting, m.status)
+	}
+	if cmd != nil {
+		if _, ok := cmd().(tea.QuitMsg); ok {
+			t.Error("godoist quit after a failed delete")
+		}
+	}
+}
+
+// A filter result in the wait does not bring the task back: Todoist still has it.
+func TestDeleteHiddenInFilter(t *testing.T) {
+	m := send(t, onRow(t, 1), key("delete"), key("enter"))
+	m = send(t, m, filterMsg{query: "all", tasks: m.st.Tasks})
+	for _, task := range m.filterTasks {
+		if task.ID == "t1" {
+			t.Fatal("the filter result shows the deleted task")
+		}
+	}
+}
+
+// u after the delete of the open project opens the project again.
+func TestDeleteProjectUndoReturns(t *testing.T) {
+	m := openWork(t)
+	m = send(t, m, key("esc")) // the sidebar
+	m.focus = paneNav
+	m.askDeleteProject(m.projects["p1"])
+	m = send(t, m, key("enter"))
+	if cur := m.currentNav(); cur != nil && cur.projectID == "p1" {
+		t.Fatal("the deleted project is still open")
+	}
+	m = send(t, m, key("u"))
+	if cur := m.currentNav(); cur == nil || cur.projectID != "p1" {
+		t.Errorf("nav = %+v after u, want the work project", cur)
 	}
 }

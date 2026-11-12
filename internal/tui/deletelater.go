@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,7 +13,8 @@ import (
 
 // A delete waits deleteDelay before it goes to Todoist, because Todoist cannot bring
 // deleted items back. Until then the items are only hidden, and u brings them back. When
-// godoist quits, the waiting deletes go at once.
+// godoist quits with q or ctrl+c, the waiting deletes go at once. A kill or a closed
+// terminal in the wait drops them, and the items stay in Todoist.
 
 // deleteDelay is how long u can undo a delete.
 const deleteDelay = 10 * time.Second
@@ -44,6 +46,10 @@ type laterDelete struct {
 
 	done      bool // Todoist took the delete
 	syncAfter int  // the last sync that may have started before Todoist took it
+
+	// Where the cursor was, so that u puts it back.
+	navWas string
+	comCur int
 }
 
 type (
@@ -62,7 +68,11 @@ func (m *Model) deleteLater(label string, hide []hiddenItem, send func(context.C
 	}
 	m.laterN++
 	n := m.laterN
-	m.laterDeletes[n] = &laterDelete{label: label, hide: hide, send: send}
+	d := &laterDelete{label: label, hide: hide, send: send, comCur: m.comCur}
+	if cur := m.currentNav(); cur != nil {
+		d.navWas = navKey(*cur)
+	}
+	m.laterDeletes[n] = d
 	m.pushUndo(undoStep{kind: undoDelete, deleteN: n})
 	m.hideDeleted()
 	m.buildNav()
@@ -172,12 +182,14 @@ func (m *Model) sendDelete(n int) tea.Cmd {
 // failed, the items show again. If it worked, they stay hidden until a sync that started
 // after it, so that an older sync does not bring them back for a moment.
 func (m Model) deleteSent(msg deleteSentMsg) (tea.Model, tea.Cmd) {
+	m.dropDeleteStep(msg.n) // u cannot stop this delete any more: older steps come first
 	if d := m.laterDeletes[msg.n]; d != nil {
 		switch {
 		case msg.act.err != nil:
 			delete(m.laterDeletes, msg.n)
 			msg.act.err = fmt.Errorf("could not delete %s · %w", d.label, msg.act.err)
 			m.applyState(m.st)
+			m.quitting = false // stay open, so that the user sees that the delete failed
 		case msg.act.queued: // the offline queue hides the items from now on
 			delete(m.laterDeletes, msg.n)
 		default:
@@ -185,6 +197,25 @@ func (m Model) deleteSent(msg deleteSentMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m.Update(msg.act)
+}
+
+// dropDeleteStep takes the undo step of delete n off the undo stack.
+func (m *Model) dropDeleteStep(n int) {
+	m.undos = slices.DeleteFunc(m.undos, func(s undoStep) bool { return s.kind == undoDelete && s.deleteN == n })
+}
+
+// withoutHidden returns st without the projects and sections of the waiting deletes, for
+// code that reads the replica, such as #project in a task name.
+func (m Model) withoutHidden(st todoist.SyncState) todoist.SyncState {
+	if len(m.laterDeletes) == 0 {
+		return st
+	}
+	hidden := m.hiddenSets()
+	st.Projects = slices.DeleteFunc(slices.Clone(st.Projects), func(p todoist.Project) bool { return hidden[hideProject][p.ID] })
+	st.Sections = slices.DeleteFunc(slices.Clone(st.Sections), func(s todoist.Section) bool {
+		return hidden[hideSection][s.ID] || hidden[hideProject][s.ProjectID]
+	})
+	return st
 }
 
 // dropSentDeletes forgets the sent deletes that sync seq already shows.
@@ -205,6 +236,11 @@ func (m *Model) undoDelete(n int) tea.Cmd {
 	}
 	delete(m.laterDeletes, n)
 	m.applyState(m.st) // the replica still has the items
+	if cur := m.currentNav(); d.navWas != "" && (cur == nil || navKey(*cur) != d.navWas) {
+		m.selectNav(func(n navItem) bool { return navKey(n) == d.navWas })
+		m.buildRows(true)
+	}
+	m.comCur = d.comCur
 	m.setStatus("Restored "+d.label, false)
 	return nil
 }

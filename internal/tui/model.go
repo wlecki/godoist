@@ -318,6 +318,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.filterQuery, m.filterTasks = msg.query, msg.tasks
+		m.hideDeleted() // Todoist still has the tasks of a waiting delete
 		m.buildNav()
 		if m.focusFilterNav {
 			if cur := m.currentNav(); cur != nil && cur.kind != vkFilter {

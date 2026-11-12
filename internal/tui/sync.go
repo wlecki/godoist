@@ -124,8 +124,6 @@ func (m *Model) simpleWrite(done string, f func(context.Context) error) tea.Cmd 
 	return m.write(done, func(ctx context.Context) (string, error) { return "", f(ctx) })
 }
 
-// ---- data → view models ----
-
 // applyState shows a new replica.
 func (m *Model) applyState(st todoist.SyncState) {
 	m.st = st

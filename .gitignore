@@ -10,13 +10,11 @@ config.toml
 sync.json
 state.toml
 
-# AI assistant files
-CLAUDE.md
+# AI assistant files (AGENTS.md and CLAUDE.md are part of the repo)
 CLAUDE.local.md
 .claude/
 .claude-work/
 .mcp.json
-AGENTS.md
 
 # Release builds (scripts/release.sh)
 /dist/

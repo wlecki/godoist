@@ -476,6 +476,7 @@ func dueByText(ctx context.Context, client *todoist.Client, id, text string) (st
 
 // calSave runs a save. The dialog stays open until the save succeeds.
 func (m Model) calSave(f func(context.Context) (string, error)) (tea.Model, tea.Cmd) {
+	m.rememberIDs(undoDue, m.cal.taskIDs)
 	m.cal.saving = true
 	m.cal.note, m.cal.noteErr = "saving…", false
 	m.pending++

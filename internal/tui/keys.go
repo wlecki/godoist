@@ -38,7 +38,23 @@ func (m Model) updateKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.showHelp {
 		return m.helpKeys(key)
 	}
+	if m.gPrefix {
+		if nm, cmd, ok := m.gotoKeys(key); ok {
+			return nm, cmd
+		}
+		m.gPrefix = false // not a jump key: it works as usual
+		if m.status == gotoHint {
+			m.setStatus("", false)
+		}
+	}
 	switch key {
+	case "g":
+		m.gPrefix = true
+		m.setStatus(gotoHint, false)
+		return m, nil
+	case "ctrl+k":
+		next := m.openGotoPicker()
+		return m, next
 	case "ctrl+c", "q":
 		return m.quit()
 	case "?":
@@ -86,7 +102,7 @@ func (m Model) updateKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, next
 	case "v":
 		return m.toggleNotes()
-	case "ctrl+z":
+	case "u", "ctrl+z":
 		return m.undo()
 	}
 
@@ -200,8 +216,17 @@ func (m Model) taskKeys(key string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "o":
 		return m.openLink()
+	case "O":
+		return m.openInTodoist()
 	case "y":
 		return m.yank(false)
+	case "Y":
+		return m.yankURL()
+	case "D":
+		next := m.duplicateTask()
+		return m, next
+	case "ctrl+a":
+		m.selectAll()
 	case "c":
 		if t := m.currentTask(); t != nil {
 			next := m.openEditor(editCommentNew, t.ID, "", "New comment · "+plain(t.Content), "")
@@ -226,7 +251,7 @@ func (m Model) taskKeys(key string) (tea.Model, tea.Cmd) {
 // taskKey reports whether key acts on the task under the cursor.
 func taskKey(key string) bool {
 	switch key {
-	case "x", "space", "e", "E", "c", "t", "p", "1", "2", "3", "4", "@", "m", "delete", "backspace":
+	case "x", "space", "e", "E", "c", "t", "p", "1", "2", "3", "4", "@", "m", "delete", "backspace", "D", "O", "Y":
 		return true
 	}
 	return false
@@ -307,8 +332,12 @@ func (m Model) detailKeys(key string) (tea.Model, tea.Cmd) {
 		return m.completeTask()
 	case "o":
 		return m.openLink()
+	case "O":
+		return m.openInTodoist()
 	case "y":
 		return m.yank(true)
+	case "Y":
+		return m.yankURL()
 	case "c":
 		if t != nil {
 			next := m.openEditor(editCommentNew, t.ID, "", "New comment · "+plain(t.Content), "")

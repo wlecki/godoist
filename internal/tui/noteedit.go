@@ -30,8 +30,9 @@ type noteEditor struct {
 	want      int // column that up/down try to keep
 	off       int // first visible screen line
 	saved     string
-	gen       int  // change counter, for the autosave timer
-	saving    bool // a save is in flight
+	orig      string // the text when the editor opened: ctrl+q goes back to it
+	gen       int    // change counter, for the autosave timer
+	saving    bool   // a save is in flight
 	err       string
 	undo      []noteState
 	redo      []noteState
@@ -110,7 +111,7 @@ func (m *Model) openNoteEditor() tea.Cmd {
 // cursor at the end of text. All text editors of the details pane use it.
 func (m *Model) openEditor(kind editKind, taskID, commentID, title, text string) tea.Cmd {
 	e := &noteEditor{kind: kind, commentID: commentID, taskID: taskID, title: title,
-		lines: splitRunes(text), saved: text, want: -1}
+		lines: splitRunes(text), saved: text, orig: text, want: -1}
 	e.row = len(e.lines) - 1
 	e.col = len(e.lines[e.row])
 	m.note = e
@@ -262,6 +263,8 @@ func (m Model) updateNoteEditor(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, e.openFind(m.detailInnerWidth())
 	case "esc", "ctrl+enter", "ctrl+s": // the editor saves, then shows the reader
 		return m.closeNoteEditor()
+	case "ctrl+q":
+		return m.discardNoteEditor()
 	}
 	return m.editKeys(e, msg, m.noteWidth(), m.paneHeight()/2)
 }

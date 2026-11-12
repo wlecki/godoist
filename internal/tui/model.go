@@ -36,6 +36,7 @@ type Model struct {
 	focus         pane
 	showHelp      bool
 	helpOff       int  // the first line of the help on the screen
+	gPrefix       bool // g was pushed: the next key is a jump key (goto.go)
 	detailOpen    bool // narrow terminals: details replace the task list
 
 	nav            []navItem
@@ -89,7 +90,7 @@ type Model struct {
 
 	status     string
 	statusErr  bool
-	closed     [][]string            // undo stack: each entry is the one-time tasks of one completion
+	undos      []undoStep            // the undo stack, newest last
 	closedTask map[string]closedTask // the name and the project of each task in closed
 
 	// The completed sub-tasks that show under their open tasks (see donesubs.go).

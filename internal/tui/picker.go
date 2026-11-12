@@ -23,6 +23,7 @@ const (
 	pickColor                      // Todoist colors, for a new project or a color change
 	pickParent                     // the new parent of a project
 	pickNoteParent                 // the new parent of a note: a note, the top level, or a project
+	pickGoto                       // the sidebar items, to go to one (ctrl+k, gp)
 )
 
 // Label states in the label picker.
@@ -51,6 +52,7 @@ type pickItem struct {
 	sectionID string
 	taskID    string // note parent picker: the note to go under
 	top       bool   // note parent picker: the top level of the notebook
+	nav       string // go-to picker: the navKey of the sidebar item
 }
 
 // picker is a filterable list that replaces the details pane. Typed text goes to the filter.
@@ -269,6 +271,12 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if p.kind == pickGoto {
+			if p.cur >= 0 && p.cur < len(vis) {
+				m.gotoNav(vis[p.cur].nav)
+			}
+			return m, nil
+		}
 		if p.kind == pickParent {
 			if p.cur >= 0 && p.cur < len(vis) {
 				pr := m.projects[p.projectID]
@@ -353,6 +361,7 @@ func (m *Model) saveLabels() tea.Cmd {
 		m.setStatus("no label changes", false)
 		return nil
 	}
+	m.rememberIDs(undoLabels, p.taskIDs)
 	newLabels := map[string][]string{}
 	for _, id := range p.taskIDs {
 		t := m.taskByID(id)
@@ -415,6 +424,7 @@ func (m *Model) moveTo(it pickItem) tea.Cmd {
 	if s := m.sections[it.sectionID]; s != nil {
 		where += " / " + s.Name
 	}
+	m.rememberIDs(undoMove, ids)
 	client := m.client
 	return m.simpleWrite(fmt.Sprintf("Moved %d task(s) to %s", len(ids), where), func(ctx context.Context) error {
 		for _, id := range ids {
@@ -489,6 +499,8 @@ func (m Model) pickerBox(w, h int) string {
 		hint = "↑/↓ select · enter move under it · esc cancel"
 	case p.kind == pickNoteParent:
 		hint = "↑/↓ select · enter move here · esc cancel"
+	case p.kind == pickGoto:
+		hint = "↑/↓ select · enter go · esc cancel"
 	case p.kind == pickColor && p.newName != "":
 		hint = "↑/↓ select · space sub-project on / off · enter create · esc cancel"
 	case p.kind == pickColor:

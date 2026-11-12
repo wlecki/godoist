@@ -759,7 +759,7 @@ func legendKey(label string) string {
 		return "ctrl+enter"
 	case "^e":
 		return "ctrl+e"
-	case "^b", "^i", "^k", "^t", "^y", "^f", "^r", "^a":
+	case "^b", "^i", "^k", "^t", "^y", "^f", "^r", "^a", "^q":
 		return "ctrl+" + label[1:]
 	case "enter", "esc", "tab", "space":
 		return label
@@ -781,7 +781,7 @@ func (m Model) legendKeys() [][2]string {
 	case m.note != nil && m.note.search != nil:
 		keys = [][2]string{{"enter", "next"}, {"shift+enter", "previous"}, {"^r", "replace"}, {"^a", "replace all"}, {"tab", "next field"}, {"esc", "close"}}
 	case m.note != nil:
-		keys = [][2]string{{"esc", "done"}, {"^e", "$EDITOR"}, {"^f", "find"}, {"^b", "bold"}, {"^i", "italic"}, {"^k", "link"}, {"^t", "checkbox"}, {"^z", "undo"}, {"^y", "redo"}, {"alt+←/→", "word"}}
+		keys = [][2]string{{"esc", "done"}, {"^q", "discard"}, {"^e", "$EDITOR"}, {"^f", "find"}, {"^b", "bold"}, {"^i", "italic"}, {"^k", "link"}, {"^t", "checkbox"}, {"^z", "undo"}, {"^y", "redo"}, {"alt+←/→", "word"}}
 	case m.cal != nil:
 		keys = [][2]string{{"tab", "text / calendar / time"}, {"enter", "save"}, {"esc", "cancel"}}
 	case m.menu != nil:
@@ -790,6 +790,8 @@ func (m Model) legendKeys() [][2]string {
 		keys = [][2]string{{"enter", "save"}, {"esc", "cancel"}, {"←/→", "move cursor"}}
 	case m.pick != nil && m.pick.kind == pickLabels:
 		keys = [][2]string{{"type", "filter"}, {"↑/↓", "select"}, {"space", "check"}, {"enter", "save"}, {"esc", "cancel"}}
+	case m.pick != nil && m.pick.kind == pickGoto:
+		keys = [][2]string{{"type", "filter"}, {"↑/↓", "select"}, {"enter", "go"}, {"esc", "cancel"}}
 	case m.pick != nil:
 		keys = [][2]string{{"type", "filter"}, {"↑/↓", "select"}, {"enter", "move"}, {"esc", "cancel"}}
 	case m.focus == paneDetail && !m.notesMode() && m.noteChecks() > 0:
@@ -823,7 +825,7 @@ func (m Model) legendKeys() [][2]string {
 	case m.notesMode():
 		keys = [][2]string{{"a", "new note"}, {"A", "sub-note"}, {"E", "edit inline"}, {"e", "rename"}, {">", "nest"}, {"<", "unnest"}, {"z", "fold"}, {"m", "move under"}, {"p", "postpone"}, {"[", "up"}, {"]", "down"}, {"c", "comment"}, {"y", "copy"}, {"v", "tasks view"}, {"/", "find"}}
 	default:
-		keys = [][2]string{{"a", "add"}, {"A", "sub-task"}, {"x", "done"}, {"e", "edit"}, {"o", "open link"}, {"y", "copy"}, {"t", "due"}, {"p", "postpone"}, {"1-4", "priority"}, {"@", "labels"}, {"m", "move"}, {"s", "select"}, {"[", "up"}, {"]", "down"}, {">", "indent"}, {"<", "outdent"}, {"z", "collapse"}, {"E", "description"}, {"c", "comment"}, {"del", "delete"}, {"^z", "undo"}, {"v", "notes view"}, {"/", "find"}, {"f", "filter"}}
+		keys = [][2]string{{"a", "add"}, {"A", "sub-task"}, {"x", "done"}, {"e", "edit"}, {"o", "open link"}, {"y", "copy"}, {"t", "due"}, {"p", "postpone"}, {"1-4", "priority"}, {"@", "labels"}, {"m", "move"}, {"s", "select"}, {"[", "up"}, {"]", "down"}, {">", "indent"}, {"<", "outdent"}, {"z", "collapse"}, {"E", "description"}, {"c", "comment"}, {"del", "delete"}, {"u", "undo"}, {"v", "notes view"}, {"/", "find"}, {"f", "filter"}}
 	}
 	// In the task list and the sidebar, esc clears an active find or filter.
 	if m.inputMode == inputNone && m.cal == nil && m.menu == nil && m.pick == nil && m.note == nil && m.focus != paneDetail {
@@ -981,7 +983,9 @@ func helpSections() [][]string {
 			k("", "details with checkboxes or sub-notes: the next one"),
 			k("h / l", "previous / next pane"),
 			k("j / k", "move down / up"),
-			k("g / G", "top / bottom"),
+			k("gg / G", "top / bottom"),
+			k("gt gu gi", "go to Today / Upcoming / Inbox"),
+			k("gp ctrl+k", "go to a view, project, or label"),
 			k("ctrl+d/u", "half page down / up"),
 			k("enter", "open the project · open the details")},
 		{h("Tasks"),
@@ -990,12 +994,16 @@ func helpSections() [][]string {
 			k("x / space", "complete"),
 			k("", "a sub-task stays under its task,"),
 			k("", "struck through · x reopens it"),
-			k("ctrl+z", "undo the last completion"),
+			k("u", "undo: completion, priority, date, labels,"),
+			k("", "move with m or the mouse"),
+			k("", "also ctrl+z"),
 			k("e", "edit name and description (#, /, @, p1–p4)"),
 			k("", "tab field · enter in description: new line"),
 			k("", "ctrl+enter save"),
 			k("E", "edit the description / note body (markdown editor)"),
 			k("o", "open the first link of the task"),
+			k("O / Y", "open the task in Todoist / copy its link"),
+			k("D", "copy the task (not its sub-tasks)"),
 			k("y", "copy the name (task list), the description or"),
 			k("", "the selected comment (details) to the clipboard"),
 			k("t", "due date: text, calendar, time"),
@@ -1010,6 +1018,7 @@ func helpSections() [][]string {
 			k("[ / ]", "move up / down (crosses sections)"),
 			k("z", "collapse / expand sub-tasks"),
 			k("s / S", "select / select a range"),
+			k("ctrl+a", "select all · again: select none"),
 			k("", "then x t p 1–4 m @ del act on all · esc clears"),
 			k("del", "delete the task (asks first)")},
 		{h("Labels (sidebar)"),
@@ -1055,6 +1064,7 @@ func helpSections() [][]string {
 			k("", "no comment selected: e edits the name")},
 		{h("Editor and pickers"),
 			k("esc", "save the editor text and close"),
+			k("ctrl+q", "close and drop the changes"),
 			k("", "ctrl+enter and ctrl+s do the same"),
 			k("ctrl+e", "open the text in $EDITOR"),
 			k("shift+arrows", "select · ctrl+a select all · drag"),

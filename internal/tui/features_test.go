@@ -304,3 +304,19 @@ func TestProjectDateOrder(t *testing.T) {
 		t.Errorf("] on a dated task: status = %q pending = %d", m.status, m.pending)
 	}
 }
+
+// ctrl+d and ctrl+u move the sidebar cursor too, as the help says.
+func TestNavHalfPage(t *testing.T) {
+	m := testModel(t)
+	m.focus = paneNav
+	start := m.navCur
+	m = send(t, m, key("ctrl+d"))
+	if m.navCur <= start {
+		t.Fatalf("ctrl+d: navCur %d, want more than %d", m.navCur, start)
+	}
+	mid := m.navCur
+	m = send(t, m, key("ctrl+u"))
+	if m.navCur >= mid {
+		t.Errorf("ctrl+u: navCur %d, want less than %d", m.navCur, mid)
+	}
+}

@@ -229,3 +229,18 @@ func TestCalendarNoShiftForEveryDay(t *testing.T) {
 		t.Error("w did something on a rule without w")
 	}
 }
+
+// The first typed character replaces the old due string. After an arrow key, typing
+// edits the old string instead.
+func TestCalendarTypingReplacesOldDate(t *testing.T) {
+	m := openCal(t, 1) // beta: "every day"
+	m = send(t, m, key("t"), key("o"), key("d"))
+	if v := m.cal.text.Value(); v != "tod" {
+		t.Errorf("after typing: %q, want %q", v, "tod")
+	}
+	m = openCal(t, 1)
+	m = send(t, m, tea.KeyPressMsg{Code: tea.KeyLeft}, key("x"))
+	if v := m.cal.text.Value(); v != "every daxy" {
+		t.Errorf("after left and x: %q, want %q", v, "every daxy")
+	}
+}

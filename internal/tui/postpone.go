@@ -2,25 +2,29 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/biomassa/godoist/internal/todoist"
 )
 
-// p postpones the task under the cursor: a dialog moves its date by 1, 2, or 3 days or a
-// week, or opens the date dialog. The time of the task stays. An overdue task counts from
-// today. A recurring task moves only this date and keeps its repeat.
+// p postpones the task under the cursor, or the selected tasks: a dialog moves the date to
+// today, or by 1, 2, or 3 days or a week, or opens the date dialog. The time of the task
+// stays. An overdue task and a task without a date count from today. A recurring task
+// moves only this date and keeps its repeat.
 
 // postponeDays are the buttons of the postpone dialog that move the date.
 var postponeDays = []struct {
 	key, label string
 	days       int
-}{{"1", "1 day", 1}, {"2", "2 days", 2}, {"3", "3 days", 3}, {"7", "A week", 7}}
+}{{"t", "Today", 0}, {"1", "1 day", 1}, {"2", "2 days", 2}, {"3", "3 days", 3}, {"7", "A week", 7}}
 
 // postponeTo returns the due time moved by days. An overdue due time counts from today,
-// at the same time of day.
+// at the same time of day. 0 days is today, also for a due time after today.
 func postponeTo(due time.Time, days int, now time.Time) time.Time {
-	if dayOf(due).Before(dayOf(now)) {
+	if days == 0 || dayOf(due).Before(dayOf(now)) {
 		due = time.Date(now.Year(), now.Month(), now.Day(), due.Hour(), due.Minute(), due.Second(), 0, time.Local)
 	}
 	return due.AddDate(0, 0, days)
@@ -35,37 +39,78 @@ func dueLabel(t time.Time, hasTime bool) string {
 	return t.Format("Mon 2 Jan")
 }
 
-// openPostpone opens the postpone dialog for the task under the cursor. A task without a
-// date gets a status message only.
+// baseDue is the due time that postpone counts from: the due time of t, or today without
+// a time for a task without a date.
+func baseDue(t *todoist.Task, now time.Time) (due time.Time, hasTime, dated bool) {
+	if due, hasTime, ok := t.Due.Time(); ok {
+		return due, hasTime, true
+	}
+	return dayOf(now), false, false
+}
+
+// openPostpone opens the postpone dialog for the task under the cursor.
 func (m *Model) openPostpone() tea.Cmd {
 	t := m.currentTask()
 	if t == nil {
 		return nil
 	}
-	due, hasTime, ok := t.Due.Time()
-	if !ok {
-		m.setStatus("this task has no date", false)
-		return nil
+	due, hasTime, dated := baseDue(t, time.Now())
+	text := "no date"
+	if dated {
+		text = "due " + dueLabel(due, hasTime)
 	}
 	id := t.ID
+	m.confirm = &confirmPrompt{title: "Postpone",
+		head: "“" + plain(t.Content) + "”",
+		text: text,
+		buttons: postponeButtons(func(m *Model, days int) tea.Cmd { return m.postpone(id, days) },
+			func(m *Model) tea.Cmd {
+				if t := m.taskByID(id); t != nil {
+					s := ""
+					if t.Due != nil {
+						s = t.Due.String
+					}
+					return m.openCalendar(t, s)
+				}
+				return nil
+			})}
+	return nil
+}
+
+// postponeButtons returns the buttons of the postpone dialog. move runs for a day button,
+// custom for "Custom...".
+func postponeButtons(move func(m *Model, days int) tea.Cmd, custom func(m *Model) tea.Cmd) []confirmButton {
 	var buttons []confirmButton
 	for _, d := range postponeDays {
 		days := d.days
 		buttons = append(buttons, confirmButton{key: d.key, label: d.label,
-			run: func(m *Model) tea.Cmd { return m.postpone(id, days) }})
+			run: func(m *Model) tea.Cmd { return move(m, days) }})
 	}
-	buttons = append(buttons,
-		confirmButton{key: "c", label: "Custom...", newRow: true, run: func(m *Model) tea.Cmd {
-			if t := m.taskByID(id); t != nil && t.Due != nil {
-				return m.openCalendar(t, t.Due.String)
-			}
-			return nil
-		}},
+	return append(buttons,
+		confirmButton{key: "c", label: "Custom...", newRow: true, run: custom},
 		confirmButton{key: "n", label: "Cancel"})
+}
+
+// openBulkPostpone opens the postpone dialog for the selected tasks. Each task moves from
+// its own date.
+func (m *Model) openBulkPostpone(ts []*todoist.Task) tea.Cmd {
+	ids := make([]string, len(ts))
+	for i, t := range ts {
+		ids[i] = t.ID
+	}
 	m.confirm = &confirmPrompt{title: "Postpone",
-		head:    "“" + plain(t.Content) + "”",
-		text:    "due " + dueLabel(due, hasTime),
-		buttons: buttons}
+		text: fmt.Sprintf("%d selected tasks", len(ts)),
+		buttons: postponeButtons(func(m *Model, days int) tea.Cmd {
+			var cmds []tea.Cmd
+			for _, id := range ids {
+				cmds = append(cmds, m.postpone(id, days))
+			}
+			m.clearSelection()
+			m.setStatus(fmt.Sprintf("Postponed %d tasks", len(ids)), false)
+			return tea.Batch(cmds...)
+		}, func(m *Model) tea.Cmd {
+			return m.openCalendarFor(m.selectedTasks())
+		})}
 	return nil
 }
 
@@ -76,19 +121,17 @@ func (m *Model) postpone(id string, days int) tea.Cmd {
 	if t == nil {
 		return nil
 	}
-	due, hasTime, ok := t.Due.Time()
-	if !ok {
-		m.setStatus("this task has no date", false)
-		return nil
-	}
+	due, hasTime, _ := baseDue(t, time.Now())
 	to := postponeTo(due, days, time.Now())
 	date, field := to.Format("2006-01-02"), "due_date"
 	if hasTime {
 		date, field = to.Format("2006-01-02T15:04:05"), "due_datetime"
 	}
 	text := "Postponed to " + dueLabel(to, hasTime)
-	recurring, rule, lang, client := t.Due.IsRecurring, t.Due.String, t.Due.Lang, m.client
+	recurring, client := t.Due != nil && t.Due.IsRecurring, m.client
+	var rule, lang string
 	if recurring {
+		rule, lang = t.Due.String, t.Due.Lang
 		text += " · repeats " + rule
 	}
 	return m.write(text, func(ctx context.Context) (string, error) {

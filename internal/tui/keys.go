@@ -36,17 +36,13 @@ func (m Model) propertyKeys(key string) (tea.Model, tea.Cmd, bool) {
 func (m Model) updateKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	if m.showHelp {
-		m.showHelp = false
-		if key == "q" || key == "ctrl+c" {
-			return m.quit()
-		}
-		return m, nil
+		return m.helpKeys(key)
 	}
 	switch key {
 	case "ctrl+c", "q":
 		return m.quit()
 	case "?":
-		m.showHelp = true
+		m.showHelp, m.helpOff = true, 0
 		return m, nil
 	case "T":
 		m.openThemePicker()
@@ -131,6 +127,10 @@ func (m Model) navKeys(key string) (tea.Model, tea.Cmd) {
 		m.moveNav(-len(m.nav))
 	case "G", "end", "pgdown":
 		m.moveNav(len(m.nav))
+	case "ctrl+d":
+		m.moveNav(max(1, m.paneHeight()/2))
+	case "ctrl+u":
+		m.moveNav(-max(1, m.paneHeight()/2))
 	case "enter", "l", "right":
 		m.focus = paneTasks
 	}
@@ -248,9 +248,12 @@ func (m Model) detailKeys(key string) (tea.Model, tea.Cmd) {
 			return m, next
 		}
 	}
-	if key == "space" && m.noteChecks() > 0 && (m.chkCur >= 0 || m.notesMode()) && m.chkCur < m.noteChecks() {
+	// With checkboxes on screen, space never completes the task: with no checkbox selected,
+	// it selects the first one. x still completes.
+	if key == "space" && m.noteChecks() > 0 && m.chkCur < m.noteChecks() {
 		if m.chkCur < 0 {
-			m.setStatus("tab selects a checkbox", false)
+			m.moveCheck(1)
+			m.setStatus("space toggles the checkbox · tab next · x completes the task", false)
 			return m, nil
 		}
 		next := m.toggleNoteCheck(m.chkCur)
@@ -330,7 +333,13 @@ func (m Model) detailKeys(key string) (tea.Model, tea.Cmd) {
 			next := m.openEditor(editDescription, t.ID, "", editTitleFor(t, m.notesMode()), t.Description)
 			return m, next
 		}
-	case "d":
+	case "d", "delete", "backspace":
+		// del and backspace delete like in the task list: the selected comment, or else
+		// the task. d deletes only a comment.
+		if t != nil && key != "d" && (m.comCur < 0 || m.comCur >= len(comments)) {
+			m.askDeleteTask()
+			return m, nil
+		}
 		if t != nil && m.comCur >= 0 && m.comCur < len(comments) {
 			id, client := comments[m.comCur].ID, m.client
 			m.confirm = yesNo("Delete comment", "Delete this comment? This cannot be undone.", "Delete", func(m *Model) tea.Cmd {
